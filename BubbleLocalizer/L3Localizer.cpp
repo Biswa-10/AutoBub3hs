@@ -515,7 +515,7 @@ void L3Localizer::CalculatePostTriggerFrameParams(int postTrigFrameNumber){
     overTheSigma = NewFrameDiffTrig - 6*this->TrainedData->TrainedSigmaImage;
 
     /*Blur and threshold to remove pixel noise*/
-    cv::blur(overTheSigma,overTheSigma, cv::Size(3,3));
+    cv::medianBlur(overTheSigma,overTheSigma, 3);
     cv::threshold(overTheSigma, overTheSigma, 3, 255, CV_THRESH_TOZERO);
     cv::threshold(overTheSigma, overTheSigma, 0, 255, CV_THRESH_BINARY|CV_THRESH_OTSU);
 
