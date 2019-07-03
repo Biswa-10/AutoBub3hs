@@ -243,7 +243,7 @@ void L3Localizer::CalculateInitialBubbleParams(void )
     /*Debug*/
     if (!this->nonStopMode) cv::imwrite("DebugPeek/"+std::to_string(CameraNumber)+"_1_TrigTrainAbsDiff.png", NewFrameDiffTrig);
 
-    overTheSigma = NewFrameDiffTrig - 8*this->TrainedData->TrainedSigmaImage;
+    overTheSigma = NewFrameDiffTrig - 6*this->TrainedData->TrainedSigmaImage;
 
     /*Debug*/
     if (!this->nonStopMode) cv::imwrite("DebugPeek/"+std::to_string(CameraNumber)+"_2_OvrThe6Sigma.png", overTheSigma);
@@ -254,24 +254,98 @@ void L3Localizer::CalculateInitialBubbleParams(void )
     //cv::threshold(overTheSigma, overTheSigma, 3, 255, CV_THRESH_TOZERO);
     cv::threshold(overTheSigma, overTheSigma, 15, 255, CV_THRESH_BINARY);
     imshow("Threshold image 1",overTheSigma);
-    cv:: Mat dist;
 
-    distanceTransform(overTheSigma,dist,DIST_L2,3);
+
+    
+    
+
+    /*Debug*/
+    if (!this->nonStopMode) cv::imwrite("DebugPeek/"+std::to_string(CameraNumber)+"_3_OtsuThresholded.png", overTheSigma);
+
+
+
+
+    /*Use contour / canny edge detection to find contours of interesting objects*/
+    std::vector<std::vector<cv::Point> > contours;
+    cv::findContours(overTheSigma, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_TC89_L1);
+
+    /*Make two vectors to store the fitted rectanglse and ellipses*/
+    //std::vector<cv::RotatedRect> minAreaRect( contours.size() );
+    std::vector<cv::Rect> minRect( contours.size() );
+
+    int BoxArea=0;
+    /*Generate the ellipses and rectangles for each contours*/
+    for( int i = 0; i < contours.size(); i++ ) {
+        minRect[i] = cv::boundingRect( contours[i]);
+        //minAreaRect[i] = cv::minAreaRect(contours[i] );
+
+        BoxArea = minRect[i].width*minRect[i].height;
+        if (BoxArea>10){
+            //std::cout<<" Bubble genesis              X: "<<minRect[i].x<<" Y: "<<minRect[i].y<<" W: "<<minRect[i].width<<" H: "<<minRect[i].height<<"\n";
+            cv::rectangle(this->presentationFrame, minRect[i], this->color_red,1,8,0);
+            this->bubbleRects.push_back(minRect[i]);
+
+            BubbleImageFrame _thisBubbleFrame;
+            _thisBubbleFrame.ContArea = cv::contourArea(contours[i]);
+            _thisBubbleFrame.ContRadius = sqrt(_thisBubbleFrame.ContArea/3.14159);
+            _thisBubbleFrame.newPosition = minRect[i];
+            _thisBubbleFrame.moments = cv::moments(contours[i], false); /*second parameter is for a binary image*/
+            _thisBubbleFrame.MassCentres = cv::Point2f( _thisBubbleFrame.moments.m10/_thisBubbleFrame.moments.m00 ,
+                                                        _thisBubbleFrame.moments.m01/_thisBubbleFrame.moments.m00);
+
+            //bubble* firstBubble = new bubble(minAreaRect[i]);
+            bubble* firstBubble = new bubble(_thisBubbleFrame);
+            this->BubbleList.push_back(firstBubble);
+
+        }
+        
+
+    }
+
+    Mat op;
+    Mat fdst = Mat::zeros(NewFrameDiffTrig.rows, NewFrameDiffTrig.cols, CV_8UC1);
+    for( int i = 0; i< contours.size(); i++ )
+     {
+       Scalar color = Scalar( 255,255,255 );
+       //fillPoly(fdst,contours,color);
+       drawContours(fdst,contours,i,color,1);
+     }
+    drawContours(fdst,contours,-1,Scalar(255,255,255),1);
+    
+  // Show in a window
+    
+    imshow( "Abub Contours",fdst);
+    fillPoly(fdst,contours,Scalar(255,255,255));
+    cv:: Mat dist;
+    distanceTransform(fdst,dist,DIST_L2,3);
     normalize(dist, dist, 0, 1.0, NORM_MINMAX);
     imshow("Distance Transform Image 2", dist);
-    blur(dist,dist,cv::Size(3,3));
+    medianBlur(dist,dist,3);
     //GaussianBlur(dist,dist,cv::Size(3,3),1,1);
 
-    threshold(dist, dist, 0.2, 1.0, CV_THRESH_BINARY);
-    imshow("Distance Transform Image : Thresholded 3", dist);
-
-    //medianBlur(dist,dist,5);
-    // Dilate a bit the dist image
-    Mat kernel1 = Mat::ones(3, 3, CV_8U);
-    //dilate(dist, dist, kernel1);
+    //expr.
+    Mat blured_dist;
+    blur(dist,blured_dist,cv::Size(7,7));
     imshow("Dialated image : 4", dist);
     // Create the CV_8U version of the distance image
     // It is needed for findContours()
+    Mat diff = dist-blured_dist;
+    normalize(diff,diff,0,1.0,NORM_MINMAX);
+    blur(diff,diff,cv::Size(3,3));
+    threshold(diff,diff,0.5,1,THRESH_BINARY);
+    erode(diff,diff,cv::Mat());
+    imshow("diff ",diff);
+
+
+    threshold(dist, dist, 0.5, 1.0, CV_THRESH_BINARY);
+    normalize(dist, dist, 0, 1.0, NORM_MINMAX);
+    imshow("Distance Transform Image : Thresholded 3", dist);
+    dist = diff;
+    //medianBlur(dist,dist,5);
+    // Dilate a bit the dist image
+    /* Mat kernel1 = Mat::ones(3, 3, CV_8U);
+    Mat dist_dialated;
+    dilate(dist,dist_dialated,kernel1);*/
     
     Mat dist_8u;
     dist.convertTo(dist_8u, CV_8U);
@@ -297,7 +371,7 @@ void L3Localizer::CalculateInitialBubbleParams(void )
         drawContours(markers, cntrs, static_cast<int>(i), Scalar::all(static_cast<int>(i)+1), -1);
     // Draw the background marker
     imshow("Markers a", markers);
-    circle(markers, Point(2,2),1, CV_RGB(255,255,255));
+    circle(markers, Point(5,5),3, CV_RGB(255,255,255));
     imshow("Markers 6", markers*10000);
     //medianBlur(markers,markers,5);
     
@@ -368,60 +442,6 @@ void L3Localizer::CalculateInitialBubbleParams(void )
     }
     // Visualize the final image
     imshow("Final Result", dst);
-    
-
-    /*Debug*/
-    if (!this->nonStopMode) cv::imwrite("DebugPeek/"+std::to_string(CameraNumber)+"_3_OtsuThresholded.png", overTheSigma);
-
-
-
-
-    /*Use contour / canny edge detection to find contours of interesting objects*/
-    std::vector<std::vector<cv::Point> > contours;
-    cv::findContours(overTheSigma, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_TC89_L1);
-
-    /*Make two vectors to store the fitted rectanglse and ellipses*/
-    //std::vector<cv::RotatedRect> minAreaRect( contours.size() );
-    std::vector<cv::Rect> minRect( contours.size() );
-
-    int BoxArea=0;
-    /*Generate the ellipses and rectangles for each contours*/
-    for( int i = 0; i < contours.size(); i++ ) {
-        minRect[i] = cv::boundingRect( contours[i]);
-        //minAreaRect[i] = cv::minAreaRect(contours[i] );
-
-        BoxArea = minRect[i].width*minRect[i].height;
-        if (BoxArea>10){
-            //std::cout<<" Bubble genesis              X: "<<minRect[i].x<<" Y: "<<minRect[i].y<<" W: "<<minRect[i].width<<" H: "<<minRect[i].height<<"\n";
-            cv::rectangle(this->presentationFrame, minRect[i], this->color_red,1,8,0);
-            this->bubbleRects.push_back(minRect[i]);
-
-            BubbleImageFrame _thisBubbleFrame;
-            _thisBubbleFrame.ContArea = cv::contourArea(contours[i]);
-            _thisBubbleFrame.ContRadius = sqrt(_thisBubbleFrame.ContArea/3.14159);
-            _thisBubbleFrame.newPosition = minRect[i];
-            _thisBubbleFrame.moments = cv::moments(contours[i], false); /*second parameter is for a binary image*/
-            _thisBubbleFrame.MassCentres = cv::Point2f( _thisBubbleFrame.moments.m10/_thisBubbleFrame.moments.m00 ,
-                                                        _thisBubbleFrame.moments.m01/_thisBubbleFrame.moments.m00);
-
-            //bubble* firstBubble = new bubble(minAreaRect[i]);
-            bubble* firstBubble = new bubble(_thisBubbleFrame);
-            this->BubbleList.push_back(firstBubble);
-
-        }
-
-    }
-
-    Mat op;
-    Mat fdst = Mat::zeros(NewFrameDiffTrig.rows, NewFrameDiffTrig.cols, CV_8UC3);
-    for( int i = 0; i< contours.size(); i++ )
-     {
-       Scalar color = Scalar( 255,255,255 );
-       drawContours( fdst, contours, i, color, 2, 8,noArray(), 0, Point() );
-     }
-
-  // Show in a window
-    imshow( "Contours",fdst);
     waitKey(0);
 
     /*Debug*/
