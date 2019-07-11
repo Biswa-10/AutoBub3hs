@@ -14,6 +14,20 @@ int findClosestBounary(int x,int y){
     return l1>l2?l2:l1;
 }
 
+int checkOverlap(cv::Mat initial,cv::Mat final){
+
+    int count = 0;
+    for(int i = 0 ; i<canvasSize ; i++){
+        for(int j = 0 ; j<canvasSize ;j++){
+            if(initial.at<float>(i,j) != final.at<float>(i,j)){
+                ++count;
+            }
+        }
+    }
+
+    return count;
+}
+
 cv::Mat generateOneCircle(cv::Mat input){
     int xCoord, yCoord,radius=0;
     while(radius<canvasSize/3){
@@ -30,6 +44,9 @@ cv::Mat generateOneCircle(cv::Mat input){
 
 cv::Mat generateTwoCircles(cv::Mat input){
     int xCoord1,yCoord1, radius1=0;
+
+    cv::Mat temp1 = cv::Mat::zeros(cv::Size(canvasSize,canvasSize), CV_8UC1);
+
     while(radius1<canvasSize/4){
 
         xCoord1 = rand()%(canvasSize-1) +1;
@@ -38,8 +55,11 @@ cv::Mat generateTwoCircles(cv::Mat input){
         int closestBoundary =findClosestBounary(xCoord1,yCoord1);
         radius1 = rand()%closestBoundary+1;
     }
-    int xCoord2,yCoord2,radius2;
 
+    circle(temp1,cv::Point(xCoord1,yCoord1),radius1,255,-1);    
+
+    int xCoord2,yCoord2,radius2;
+    
     int flag = 0,countOuter =0;
 
     while(flag == 0 && countOuter<10){
@@ -51,13 +71,19 @@ cv::Mat generateTwoCircles(cv::Mat input){
 
         while(radius2>0 && countInner<30 && flag == 0){
 
+            cv::Mat temp2 = cv::Mat::zeros(cv::Size(canvasSize,canvasSize), CV_8UC1);
+            circle(temp2,cv::Point(xCoord1,yCoord1),radius1,255,-1);  
+
             xCoord2 = rand()%(canvasSize-1) +1;
             yCoord2 = rand()%(canvasSize-1) +1;
 
             double dist = sqrt((xCoord1-xCoord2)*(xCoord1-xCoord2)+(yCoord1-yCoord2)*(yCoord1-yCoord2));
 
-            if(dist<=(radius1+radius2) && (findClosestBounary(xCoord2,yCoord2)-radius2)>=0 && dist>abs(radius1-radius2)&&dist>radius1/2){
-                flag =1;
+            if((findClosestBounary(xCoord2,yCoord2)-radius2)>=0 && dist<=(radius1+radius2)){
+                circle(temp2,cv::Point(xCoord2,yCoord2),radius2,255,-1);
+                if(checkOverlap(temp1,temp2)>radius1*radius1){
+                    flag =1;
+                }
                 break;
             }
             countInner++;
@@ -74,15 +100,25 @@ cv::Mat generateTwoCircles(cv::Mat input){
 
 }
 
+
+
 cv::Mat generateThreeCircles(cv::Mat input){
+
     int xCoord1,yCoord1,radius1=0;
-    while(radius1<canvasSize/5)
+
+    cv::Mat temp1 = cv::Mat::zeros(cv::Size(canvasSize,canvasSize), CV_8UC1);
+     
+
+    while(radius1<canvasSize/6)
     {
         xCoord1 = rand()%(canvasSize-1) +1;
         yCoord1 = rand()%(canvasSize-1) +1;
         int closestBoundary =findClosestBounary(xCoord1,yCoord1);
         radius1 = rand()%closestBoundary+1;
     }
+
+    circle(temp1,cv::Point(xCoord1,yCoord1),radius1,255,-1);
+
     int xCoord2,yCoord2,radius2;
     int xCoord3,yCoord3,radius3;
 
@@ -102,26 +138,46 @@ cv::Mat generateThreeCircles(cv::Mat input){
         int countInner =0;
 
         while(radius2>0 && radius3>0 && countInner<30 && flag == 0){
+            cv::Mat temp2 = cv::Mat::zeros(cv::Size(canvasSize,canvasSize), CV_8UC1);
+              
+            circle(temp2,cv::Point(xCoord1,yCoord1),radius1,255,-1);
 
             xCoord2 = rand()%(canvasSize-1) +1;
             yCoord2 = rand()%(canvasSize-1) +1;
             
+            circle(temp2,cv::Point(xCoord2,yCoord2),radius2,255,-1);
             
             double dist12 = sqrt((xCoord1-xCoord2)*(xCoord1-xCoord2)+(yCoord1-yCoord2)*(yCoord1-yCoord2));
             int flag1=0;
-            if(dist12<=(radius1+radius2) && (findClosestBounary(xCoord2,yCoord2)-radius2)>=0 && dist12>abs(radius1-radius2) && dist12>radius1/2){
+
+            if(dist12<=(radius1+radius2) && (findClosestBounary(xCoord2,yCoord2)-radius2)>=0 && checkOverlap(temp1,temp2)>radius1*radius1){
+                
                 int count3 =0;
-                while (count3<20){
+
+                while (count3<20 && flag==0){
+
                     xCoord3 = rand()%(canvasSize-1) +1;
                     yCoord3 = rand()%(canvasSize-1) +1;
-                
+
+
                     double dist31 = sqrt((xCoord1-xCoord3)*(xCoord1-xCoord3)+(yCoord1-yCoord3)*(yCoord1-yCoord3));
                     double dist23 = sqrt((xCoord3-xCoord2)*(xCoord3-xCoord2)+(yCoord3-yCoord2)*(yCoord3-yCoord2));
-                    if(dist31<=(radius1+radius3) && (findClosestBounary(xCoord3,yCoord3)-radius3)>=0 && dist31>3*abs(radius1-radius3) && dist23>3*abs(radius2-radius3) 
-                           && dist31>dist12 && dist23>dist12){
-                        flag =1;
-                        break;
+
+                    if((dist31<=(radius1+radius3)|| dist23<=(radius2+radius3)) && (findClosestBounary(xCoord3,yCoord3)-radius3)>=0){
+                        
+                        cv::Mat temp3 = cv::Mat::zeros(cv::Size(canvasSize,canvasSize), CV_8UC1); 
+
+                        circle(temp3,cv::Point(xCoord1,yCoord1),radius1,255,-1);
+                        circle(temp3,cv::Point(xCoord2,yCoord2),radius2,255,-1);
+                        circle(temp3,cv::Point(xCoord3,yCoord3),radius3,255,-1);
+
+                        if(checkOverlap(temp2,temp3)>radius1*radius1){
+                            flag =1;
+                            break;
+                        }
+                        
                     }
+                    
                 }
             }
             countInner++;
@@ -155,9 +211,9 @@ int main()
         
     for(int i = 0 ;i<10000 ; i++){
 
-        std::string dir1 = "./1Circle/"+to_string(i)+".jpg";
-        std::string dir2 = "./2Circle/"+to_string(i)+".jpg";
-        std::string dir3 = "./3Circle/"+to_string(i)+".jpg";
+        std::string dir1 = "./1Circle/"+to_string(i)+".png";
+        std::string dir2 = "./2Circle/"+to_string(i)+".png";
+        std::string dir3 = "./3Circle/"+to_string(i)+".png";
         
         //circle(generated,cv::Point(25,25),25,255,-1);
 
@@ -174,7 +230,7 @@ int main()
         imwrite(dir2,c2*255);
 
         cv::Mat c3 = cv::Mat::zeros(cv::Size(canvasSize,canvasSize), CV_8UC1);
-        c3 = generateTwoCircles(c3);
+        c3 = generateThreeCircles(c3);
         distanceTransform(c3, c3, CV_DIST_L1, 3);
         normalize(c3, c3, 0, 1.0, CV_MINMAX);
         imwrite(dir3,c3*255);
