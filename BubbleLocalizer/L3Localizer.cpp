@@ -271,6 +271,153 @@ void L3Localizer::CalculateInitialBubbleParams(void )
             bubble* firstBubble = new bubble(_thisBubbleFrame);
             this->BubbleList.push_back(firstBubble);
 
+        
+            cv::Mat mask = cv::Mat::zeros(cv::Size(triggerFrame.size()),CV_8UC1);
+            imshow("mask ",mask);
+            drawContours(mask,contours,i,255,-1);
+            //cv::rectangle(mask,minRect[i],255,1);
+            imshow("mask 2",mask);
+            /* 
+            //cv::Rect rect();
+            cv::Mat miniMat = cv::Mat::zeros(cv::Size(minRect[i].width,minRect[i].height),CV_8UC1);
+
+            int count = 0;
+            for(int j = 0; j<minRect[i].width ; j++){
+                for(int k =0  ; k<minRect[i].height; k++){
+                    cout<<j<<" "<<k<<endl;
+                    cout<<minRect[i].width<<" "<<minRect[i].height<<endl; 
+                    miniMat.at<uchar>(j,k) = mask.at<uchar>( j + minRect[i].x , k + minRect[i].y );
+                    cout<<"Minmat value "<<(int)miniMat.at<uchar>(j,k);
+                    cout<<miniMat.size();
+                    //cout<<(int)miniMat.at<uchar>(j,k)<<endl;
+                    //cout<<"Mask value"<<(int)mask.at<uchar>(j+minRect[i].x,k+minRect[i].y)<<endl;
+                    cout<<endl;
+                    ++count;
+                }
+            }
+            cout<<endl<<endl<<count;
+            //imshow("presentation frame",this->presentationFrame);
+            imshow("minimat",miniMat);
+            */
+            cv::Mat triggerFrame = this->triggerFrame.clone();
+            int x = minRect[i].x;
+            int y = minRect[i].y;
+            int w = minRect[i].width;
+            int h = minRect[i].height;
+            cv::Rect toCrop = cv::Rect(x-1,y-1,w+2,h+2);
+            cv:: Mat triggerCropped = triggerFrame(toCrop);
+            cv::Mat subImage = mask(minRect[i]);
+            imshow("cropped trigger ", triggerCropped);
+            imshow("Autobub Contour ",subImage);
+            imshow("trig frame",this->triggerFrame);
+            //imwrite("./trigframe",this->triggerFrame);
+            /* cv::Mat padded;
+            if(subImage.rows>subImage.cols){
+                padded.create(subImage.rows + 5, subImage.rows + 5, subImage.type());
+                padded.setTo(cv::Scalar::all(0));
+                
+            }
+            else{
+                padded.create(subImage.cols + 5, subImage.cols + 5, subImage.type());
+                padded.setTo(cv::Scalar::all(0));
+            }
+
+            subImage.copyTo(padded(Rect(2, 2, subImage.cols, subImage.rows)));
+            cout<<padded.size();
+            imshow("padded Image ",padded);
+            cv::Mat resizedMat;
+            cv::resize(padded,resizedMat,cv::Size(50,50));
+            distanceTransform(resizedMat,resizedMat, CV_DIST_L1, 3);
+            normalize(resizedMat, resizedMat, 0, 1.0, CV_MINMAX);
+            imwrite("./img1.png",resizedMat*255);
+            imwrite("./trig.png",triggerCropped);
+            */
+            cv::Mat sharpened;
+            cv::GaussianBlur(triggerCropped,sharpened, cv::Size(0, 0), 3);
+            cv::addWeighted(triggerCropped, 2, sharpened, -1.0, 0, sharpened);
+            imshow("sharpened ",sharpened);
+            normalize(sharpened,sharpened,255,0,CV_MINMAX);
+            
+            cv::Mat equalized;
+            equalizeHist(triggerCropped,equalized);
+
+            
+
+            cv::Mat rescaled;
+            cv::Mat padded;
+            if(equalized.rows>equalized.cols){
+                padded.create(equalized.rows + 5, equalized.rows + 5, equalized.type());
+                padded.setTo(cv::Scalar::all(255));
+                
+            }
+            else{
+                padded.create(equalized.cols + 5, equalized.cols + 5, equalized.type());
+                padded.setTo(cv::Scalar::all(255));
+            }
+
+            equalized.copyTo(padded(cv::Rect(2, 2, equalized.cols, equalized.rows)));
+            cout<<padded.size();
+
+            cv::resize(padded,rescaled,cv::Size(50,50));
+            equalized = rescaled;
+            imshow("equalized ", equalized);
+            medianBlur(equalized,equalized,7);
+            imwrite("./equalized.png",equalized);
+
+            cv::threshold(equalized, equalized, 130, 255, CV_THRESH_BINARY_INV);
+            imshow("sharpened ",equalized);
+            
+            std::vector<std::vector<cv::Point> > newContours;
+            findContours(equalized,newContours,CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+
+            float maxArea = 0;
+            int biggestContour = 0;
+            for(int contourNo = 0; contourNo<newContours.size(); contourNo++){
+                float area = cv::contourArea(newContours[contourNo]);
+                if(area>maxArea){
+                    biggestContour = contourNo;
+                }
+            }
+
+            cv::Mat background = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
+            drawContours(background,newContours,biggestContour,255,-1);
+            
+            blur(background,background,cv::Size(3,3));
+            threshold(background,background,100,255,CV_THRESH_BINARY);
+            imshow("Contour Image ", background);
+
+
+            //cv::approxPolyDP(newContours[biggestContour],newContours[biggestContour],10,true);
+            cv::Mat approxContour = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
+            drawContours(approxContour,newContours,biggestContour,255,-1);
+            medianBlur(approxContour,approxContour,5);
+            imshow("Approximated Contour", approxContour);
+
+            background= approxContour;
+
+            GaussianBlur( approxContour, approxContour, cv::Size(5, 5), 2, 2 );
+    
+            vector<cv::Vec3f> circles;
+            HoughCircles(approxContour, circles, CV_HOUGH_GRADIENT,1.2, 6,30,20);
+            cout<<circles.size();
+            cv::Mat img = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
+            for( size_t i = 0; i < circles.size(); i++ )
+            {
+                cv::Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
+                int radius = cvRound(circles[i][2]);
+                // draw the circle center
+                circle( img, center, 3, 255, 1, 8, 0 );
+                // draw the circle outline
+                circle( img, center, radius, 255, 1, 8, 0 );
+            }
+            imshow("Hough trans ",img);
+
+            cv::Mat dist;
+            distanceTransform(background, dist, CV_DIST_L1, 3);
+            normalize(dist, dist, 0, 1.0, CV_MINMAX);
+            imshow("Dist transformation ",dist);
+            imwrite("./trig.png",dist*255);
+            waitKey(0);
         }
 
     }
@@ -362,6 +509,138 @@ void L3Localizer::CalculateInitialBubbleParamsCam2(void )
             //bubble* firstBubble = new bubble(minAreaRect[i]);
             bubble* firstBubble = new bubble(_thisBubbleFrame);
             this->BubbleList.push_back(firstBubble);
+            cv::Mat mask = cv::Mat::zeros(cv::Size(triggerFrame.size()),CV_8UC1);
+            imshow("mask ",mask);
+            drawContours(mask,contours,i,255,-1);
+            //cv::rectangle(mask,minRect[i],255,1);
+            imshow("mask 2",mask);
+            /* 
+            //cv::Rect rect();
+            cv::Mat miniMat = cv::Mat::zeros(cv::Size(minRect[i].width,minRect[i].height),CV_8UC1);
+
+            int count = 0;
+            for(int j = 0; j<minRect[i].width ; j++){
+                for(int k =0  ; k<minRect[i].height; k++){
+                    cout<<j<<" "<<k<<endl;
+                    cout<<minRect[i].width<<" "<<minRect[i].height<<endl; 
+                    miniMat.at<uchar>(j,k) = mask.at<uchar>( j + minRect[i].x , k + minRect[i].y );
+                    cout<<"Minmat value "<<(int)miniMat.at<uchar>(j,k);
+                    cout<<miniMat.size();
+                    //cout<<(int)miniMat.at<uchar>(j,k)<<endl;
+                    //cout<<"Mask value"<<(int)mask.at<uchar>(j+minRect[i].x,k+minRect[i].y)<<endl;
+                    cout<<endl;
+                    ++count;
+                }
+            }
+            cout<<endl<<endl<<count;
+            //imshow("presentation frame",this->presentationFrame);
+            imshow("minimat",miniMat);
+            */
+            cv::Mat triggerFrame = this->triggerFrame.clone();
+            int x = minRect[i].x;
+            int y = minRect[i].y;
+            int w = minRect[i].width;
+            int h = minRect[i].height;
+            cv::Rect toCrop = cv::Rect(x-1,y-1,w+2,h+2);
+            cv:: Mat triggerCropped = triggerFrame(toCrop);
+            cv::Mat subImage = mask(minRect[i]);
+            imshow("cropped trigger ", triggerCropped);
+            imshow("Autobub Contour ",subImage);
+            imshow("trig frame",this->triggerFrame);
+            /* cv::Mat padded;
+            if(subImage.rows>subImage.cols){
+                padded.create(subImage.rows + 5, subImage.rows + 5, subImage.type());
+                padded.setTo(cv::Scalar::all(0));
+                
+            }
+            else{
+                padded.create(subImage.cols + 5, subImage.cols + 5, subImage.type());
+                padded.setTo(cv::Scalar::all(0));
+            }
+
+            subImage.copyTo(padded(Rect(2, 2, subImage.cols, subImage.rows)));
+            cout<<padded.size();
+            imshow("padded Image ",padded);
+            cv::Mat resizedMat;
+            cv::resize(padded,resizedMat,cv::Size(50,50));
+            distanceTransform(resizedMat,resizedMat, CV_DIST_L1, 3);
+            normalize(resizedMat, resizedMat, 0, 1.0, CV_MINMAX);
+            imwrite("./img1.png",resizedMat*255);
+            imwrite("./trig.png",triggerCropped);
+            */
+            cv::Mat sharpened;
+            cv::GaussianBlur(triggerCropped,sharpened, cv::Size(0, 0), 3);
+            cv::addWeighted(triggerCropped, 2, sharpened, -1, 0, sharpened);
+            imshow("sharpened ",sharpened);
+            normalize(sharpened,sharpened,255,0,CV_MINMAX);
+            cv::Mat equalized;
+            equalizeHist(sharpened,equalized);
+            cv::Mat rescaled;
+            cv::Mat padded;
+            if(equalized.rows>equalized.cols){
+                padded.create(equalized.rows + 5, equalized.rows + 5, equalized.type());
+                padded.setTo(cv::Scalar::all(255));
+                
+            }
+            else{
+                padded.create(equalized.cols + 5, equalized.cols + 5, equalized.type());
+                padded.setTo(cv::Scalar::all(255));
+            }
+
+            equalized.copyTo(padded(cv::Rect(2, 2, equalized.cols, equalized.rows)));
+            cout<<padded.size();
+
+            cv::resize(padded,rescaled,cv::Size(50,50));
+            equalized = rescaled;
+            imshow("equalized ", equalized);
+            cv::threshold(equalized, equalized, 127.5, 255, CV_THRESH_BINARY_INV);
+            imshow("sharpened ",equalized);
+            std::vector<std::vector<cv::Point> > newContours;
+            findContours(equalized,newContours,CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+
+            float maxArea = 0;
+            int biggestContour = 0;
+            for(int contourNo = 0; contourNo<newContours.size(); contourNo++){
+                float area = cv::contourArea(newContours[contourNo]);
+                if(area>maxArea){
+                    biggestContour = contourNo;
+                }
+            }
+
+            cv::Mat background = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
+            drawContours(background,newContours,biggestContour,255,-1);
+            
+            blur(background,background,cv::Size(3,3));
+            threshold(background,background,127.5,255,CV_THRESH_BINARY);
+            imshow("Contour Image ", background);
+
+            cv::Mat approxContour = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
+            drawContours(approxContour,newContours,biggestContour,255,-1);
+            medianBlur(approxContour,approxContour,7);
+            imshow("Approximated Contour", approxContour);
+
+            background= approxContour;
+
+            GaussianBlur( approxContour, approxContour, cv::Size(5, 5), 2, 2 );
+    
+            vector<cv::Vec3f> circles;
+            HoughCircles(approxContour, circles, CV_HOUGH_GRADIENT,1.2, 6,30,20);
+            cout<<circles.size();
+            cv::Mat img = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
+            for( size_t i = 0; i < circles.size(); i++ )
+            {
+                cv::Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
+                int radius = cvRound(circles[i][2]);
+                // draw the circle center
+                circle( img, center, 3, 255, 1, 8, 0 );
+                // draw the circle outline
+                circle( img, center, radius, 255, 1, 8, 0 );
+            }
+
+            imshow("Hough trans ",img);
+
+            waitKey(0);
+           
 
         }
 
