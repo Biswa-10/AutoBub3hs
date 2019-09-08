@@ -193,7 +193,19 @@ void L3Localizer::rem_unique(std::vector<cv::Rect>& L2SearchAreas, std::vector<c
 
 }
 
+int checkOverlap(cv::Mat initial,cv::Mat final){
 
+    int count = 0;
+    for(int i = 0 ; i<initial.rows ; i++){
+        for(int j = 0 ; j<initial.cols ;j++){
+            if(initial.at<uchar>(i,j) != final.at<uchar>(i,j)){
+                ++count;
+            }
+        }
+    }
+
+    return count;
+}
 
 /* ******************************************************************************
  * This function is the primary localizer for the bubble finding algorithm.
@@ -387,7 +399,11 @@ void L3Localizer::CalculateInitialBubbleParams(void )
                 But the CNN step is not recommended!
 
             */
-            cout<<circles.size();
+            //cout<<circles.size();
+
+            int maxCircleRadius = -1 ;
+            int biggestCircleIndex = -1 ;
+
             cv::Mat img = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
             for( size_t i = 0; i < circles.size(); i++ )
             {
@@ -397,10 +413,34 @@ void L3Localizer::CalculateInitialBubbleParams(void )
                 circle( img, center, 3, 255, 1, 8, 0 );
                 // draw the circle outline
                 circle( img, center, radius, 255, 1, 8, 0 );
+                if(radius>maxCircleRadius){
+                    maxCircleRadius= radius;
+                    biggestCircleIndex = i ;
+                }
+            }
+            imshow("Hough trans ",img);
+            cv::Mat finalOutputSolid = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
+            cv::Mat finalOutput = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
+
+            cv::Point centerBiggest(cvRound(circles[biggestCircleIndex][0]), cvRound(circles[biggestCircleIndex][1]));
+            circle( finalOutputSolid, centerBiggest, cvRound(circles[biggestCircleIndex][2]), 255, -1, 8, 0 );
+            circle( finalOutput, centerBiggest, cvRound(circles[biggestCircleIndex][2]), 255, 1, 8, 0 );
+            
+            for( size_t i = 0; i < circles.size(); i++ )
+            {
+                cv::Mat temp = finalOutputSolid.clone();
+
+                cv::Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
+                int radius = cvRound(circles[i][2]);
+                // draw the circle outline
+                circle( temp, center, radius, 255, -1, 8, 0 );
+                if(checkOverlap(temp,finalOutputSolid)>maxCircleRadius*maxCircleRadius){
+                    circle(finalOutputSolid,center,radius,255,-1,8,0);
+                    circle(finalOutput,center,radius,255,1,8,0);
+                }
             }
 
-            imshow("Hough trans ",img);
-
+            imshow("Final Output (Area constraint)",finalOutput);
             waitKey(0);
         }
 
@@ -609,7 +649,11 @@ void L3Localizer::CalculateInitialBubbleParamsCam2(void )
                 But the CNN step is not recommended!
 
             */
-            cout<<circles.size();
+            //cout<<circles.size();
+
+            int maxCircleRadius = -1 ;
+            int biggestCircleIndex = -1 ;
+
             cv::Mat img = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
             for( size_t i = 0; i < circles.size(); i++ )
             {
@@ -619,10 +663,36 @@ void L3Localizer::CalculateInitialBubbleParamsCam2(void )
                 circle( img, center, 3, 255, 1, 8, 0 );
                 // draw the circle outline
                 circle( img, center, radius, 255, 1, 8, 0 );
+                if(radius>maxCircleRadius){
+                    maxCircleRadius= radius;
+                    biggestCircleIndex = i ;
+                }
             }
-
             imshow("Hough trans ",img);
 
+            cv::Mat finalOutputSolid = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
+            cv::Mat finalOutput = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
+
+            cv::Point centerBiggest(cvRound(circles[biggestCircleIndex][0]), cvRound(circles[biggestCircleIndex][1]));
+            circle( finalOutputSolid, centerBiggest, cvRound(circles[biggestCircleIndex][2]), 255, -1, 8, 0 );
+            circle( finalOutput, centerBiggest, cvRound(circles[biggestCircleIndex][2]), 255, 1, 8, 0 );
+            
+            for( size_t i = 0; i < circles.size(); i++ )
+            {
+                cv::Mat temp = finalOutputSolid.clone();
+
+                cv::Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
+                int radius = cvRound(circles[i][2]);
+                // draw the circle outline
+                circle( temp, center, radius, 255, -1, 8, 0 );
+                if(checkOverlap(temp,finalOutputSolid)>maxCircleRadius*maxCircleRadius){
+                    circle(finalOutputSolid,center,radius,255,-1,8,0);
+                    circle(finalOutput,center,radius,255,1,8,0);
+                }
+            }
+
+            imshow("Final Output (Area constraint)",finalOutput);
+            waitKey(0);
             waitKey(0);
            
 
