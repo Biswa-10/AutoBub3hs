@@ -284,17 +284,17 @@ void L3Localizer::CalculateInitialBubbleParams(void )
             this->BubbleList.push_back(firstBubble);
 
         
-            /*
+            /*************************************
             
             Multi Bubble detection code begins 
 
-            */
+            **************************************/
 
 
-            /*
+            /*******
                 Crop out the region of the bubble from the image, Keeping some extra space near the edges
                 [Note theat an assumption has been made that the bubbles are not at the extreme corner]
-            */
+            *******/
             cv::Mat mask = cv::Mat::zeros(cv::Size(triggerFrame.size()),CV_8UC1);
             imshow("mask ",mask);
             drawContours(mask,contours,i,255,-1);
@@ -319,15 +319,15 @@ void L3Localizer::CalculateInitialBubbleParams(void )
             imshow("sharpened ",sharpened);
             normalize(sharpened,sharpened,255,0,CV_MINMAX);
 
-            /*
+            /********
                 Apply histogram equalization
-            */
+            ********/
             cv::Mat equalized;
             equalizeHist(sharpened,equalized);
 
-            /*
+            /*********
                 Reshape the image into 50*50 add extra padding if required
-            */
+            *********/
             cv::Mat rescaled;
             cv::Mat padded;
             if(equalized.rows>equalized.cols){
@@ -347,10 +347,10 @@ void L3Localizer::CalculateInitialBubbleParams(void )
             equalized = rescaled;
             imshow("equalized ", equalized);
 
-            /*                
+            /********                
                 since the padding has a hard boundary with pixel value 255, we need to apply thresholding to removice this boundary
                 otherwise contour detection algorithm will detect rectangle around the previous image
-            */
+            ********/
             cv::threshold(equalized, equalized, 127.5, 255, CV_THRESH_BINARY_INV);
             imshow("sharpened ",equalized);
 
@@ -381,24 +381,24 @@ void L3Localizer::CalculateInitialBubbleParams(void )
 
             background= approxContour;
 
-            /*
+            /*********
 
-                To prevent Hough Transformation from detecting too many circles, we usually apply Hough Transforamtion.
-                The parameters of Gaussian Blur and the function Hough Circles iare the most importment parameters.
+                To prevent Hough Transformation from detecting too many circles, we usually apply a blur function.
+                The parameters of Gaussian Blur and the function Hough Circles are the most importment parameters.
 
-            */
+            *********/
 
             GaussianBlur( approxContour, approxContour, cv::Size(5, 5), 2, 2 );
     
             vector<cv::Vec3f> circles;
             HoughCircles(approxContour, circles, CV_HOUGH_GRADIENT,1.2, 6,30,20);
 
-            /*
+            /********
 
                 Once we draw the circles of the Hough Transformation Output, we can feed it into the CNN network.
                 But the CNN step is not recommended!
 
-            */
+            ********/
             //cout<<circles.size();
 
             int maxCircleRadius = -1 ;
@@ -419,6 +419,12 @@ void L3Localizer::CalculateInitialBubbleParams(void )
                 }
             }
             imshow("Hough trans ",img);
+
+            /*********
+                    Adding the area constraint of atleast 1/3rd non overlapping area
+                    *Assume that the biggest contour is the correct one*
+            **********/
+
             cv::Mat finalOutputSolid = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
             cv::Mat finalOutput = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
 
@@ -534,17 +540,17 @@ void L3Localizer::CalculateInitialBubbleParamsCam2(void )
             bubble* firstBubble = new bubble(_thisBubbleFrame);
             this->BubbleList.push_back(firstBubble);
 
-            /*
+            /**********************************
             
             Multi Bubble detection code begins 
 
-            */
+            ***********************************/
 
 
-            /*
+            /**********
                 Crop out the region of the bubble from the image, Keeping some extra space near the edges
                 [Note theat an assumption has been made that the bubbles are not at the extreme corner]
-            */
+            **********/
             cv::Mat mask = cv::Mat::zeros(cv::Size(triggerFrame.size()),CV_8UC1);
             imshow("mask ",mask);
             drawContours(mask,contours,i,255,-1);
@@ -569,15 +575,15 @@ void L3Localizer::CalculateInitialBubbleParamsCam2(void )
             imshow("sharpened ",sharpened);
             normalize(sharpened,sharpened,255,0,CV_MINMAX);
 
-            /*
+            /*****
                 Apply histogram equalization
-            */
+            *****/
             cv::Mat equalized;
             equalizeHist(sharpened,equalized);
 
-            /*
+            /******
                 Reshape the image into 50*50 add extra padding if required
-            */
+            ******/
             cv::Mat rescaled;
             cv::Mat padded;
             if(equalized.rows>equalized.cols){
@@ -597,10 +603,10 @@ void L3Localizer::CalculateInitialBubbleParamsCam2(void )
             equalized = rescaled;
             imshow("equalized ", equalized);
 
-            /*                
+            /******                
                 since the padding has a hard boundary with pixel value 255, we need to apply thresholding to removice this boundary
                 otherwise contour detection algorithm will detect rectangle around the previous image
-            */
+            ******/
             cv::threshold(equalized, equalized, 127.5, 255, CV_THRESH_BINARY_INV);
             imshow("sharpened ",equalized);
 
@@ -631,24 +637,24 @@ void L3Localizer::CalculateInitialBubbleParamsCam2(void )
 
             background= approxContour;
 
-            /*
+            /*******
 
-                To prevent Hough Transformation from detecting too many circles, we usually apply Hough Transforamtion.
-                The parameters of Gaussian Blur and the function Hough Circles iare the most importment parameters.
+                To prevent Hough Transformation from detecting too many circles, we usually apply blur.
+                The parameters of Gaussian Blur and the function Hough Circles are the most importment parameters.
 
-            */
+            *******/
 
             GaussianBlur( approxContour, approxContour, cv::Size(5, 5), 2, 2 );
     
             vector<cv::Vec3f> circles;
             HoughCircles(approxContour, circles, CV_HOUGH_GRADIENT,1.2, 6,30,20);
 
-            /*
+            /*******
 
                 Once we draw the circles of the Hough Transformation Output, we can feed it into the CNN network.
                 But the CNN step is not recommended!
 
-            */
+            *******/
             //cout<<circles.size();
 
             int maxCircleRadius = -1 ;
@@ -669,6 +675,11 @@ void L3Localizer::CalculateInitialBubbleParamsCam2(void )
                 }
             }
             imshow("Hough trans ",img);
+
+            /*********
+                    Adding the area constraint of atleast 1/3rd non overlapping area
+                    *Assume that the biggest contour is the correct one*
+            **********/
 
             cv::Mat finalOutputSolid = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
             cv::Mat finalOutput = cv::Mat::zeros(cv::Size(50,50),CV_8UC1);
