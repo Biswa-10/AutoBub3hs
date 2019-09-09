@@ -704,7 +704,6 @@ void L3Localizer::CalculateInitialBubbleParamsCam2(void )
 
             imshow("Final Output (Area constraint)",finalOutput);
             waitKey(0);
-            waitKey(0);
            
 
         }
